@@ -170,7 +170,6 @@ Immediate priorities are:
 - PMIC and regulators (only ACT8846 is supported at present)
 - LCD and HDMI
 - Run CPU at full speed
-- Ethernet
 - NAND flash
 - Support for other Rockchip parts
 - Boot U-Boot proper over USB OTG (at present only SPL works)
