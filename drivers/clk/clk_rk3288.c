@@ -442,6 +442,18 @@ static ulong rockchip_mmc_set_clk(struct rk3288_cru *cru, uint clk_general_rate,
 	return rockchip_mmc_get_clk(cru, clk_general_rate, periph);
 }
 
+static ulong rockchip_gmac_set_clk(struct rk3288_cru *cru,
+				  uint clk_general_rate,
+				  enum periph_id periph, uint freq)
+{
+	/* Assuming mac_clk is fed by an external clock */
+	rk_clrsetreg(&cru->cru_clksel_con[21],
+		     RMII_EXTCLK_MASK << RMII_EXTCLK_SHIFT,
+		     RMII_EXTCLK_SELECT_EXT_CLK << RMII_EXTCLK_SHIFT);
+
+	 return 0;
+}
+
 static ulong rockchip_spi_get_clk(struct rk3288_cru *cru, uint clk_general_rate,
 				  enum periph_id periph)
 {
@@ -514,6 +526,10 @@ ulong rk3288_set_periph_rate(struct udevice *dev, int periph, ulong rate)
 	ulong new_rate;
 
 	switch (periph) {
+	case PERIPH_ID_GMAC:
+		new_rate = rockchip_gmac_set_clk(priv->cru, clk_get_rate(dev),
+						periph, rate);
+		break;
 	case PERIPH_ID_EMMC:
 	case PERIPH_ID_SDCARD:
 		new_rate = rockchip_mmc_set_clk(priv->cru, clk_get_rate(dev),
