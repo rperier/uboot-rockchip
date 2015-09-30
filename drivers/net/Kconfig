@@ -92,4 +92,11 @@ config PCH_GBE
 	  This MAC is present in Intel Platform Controller Hub EG20T. It
 	  supports 10/100/1000 Mbps operation.
 
+config GMAC_RK3288
+	bool "Rockchip RK3288 Synopsys Designware Ethernet MAC"
+	depends on DM_ETH && ETH_DESIGNWARE
+	help
+	  This driver provides Rockchip RK3288 network support based on the
+	  Synopsys Designware driver.
+
 endif # NETDEVICES
