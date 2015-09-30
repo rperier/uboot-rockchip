@@ -8,6 +8,9 @@
 #ifndef _DW_ETH_H
 #define _DW_ETH_H
 
+#include <common.h>
+#include <asm/gpio.h>
+
 #define CONFIG_TX_DESCR_NUM	16
 #define CONFIG_RX_DESCR_NUM	16
 #define CONFIG_ETH_BUFSIZE	2048
@@ -234,5 +237,13 @@ struct dw_eth_dev {
 	struct phy_device *phydev;
 	struct mii_dev *bus;
 };
+
+#ifdef CONFIG_DM_ETH
+struct dw_eth_pdata {
+	struct eth_pdata eth_pdata;
+	struct gpio_desc reset_gpio;
+	u32 reset_delays[3];
+};
+#endif
 
 #endif

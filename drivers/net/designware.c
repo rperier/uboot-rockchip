@@ -28,7 +28,12 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static int dw_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 {
+#ifdef CONFIG_DM_ETH
+	struct dw_eth_dev *priv = dev_get_priv((struct udevice *)bus->priv);
+	struct eth_mac_regs *mac_p = priv->mac_regs_p;
+#else
 	struct eth_mac_regs *mac_p = bus->priv;
+#endif
 	ulong start;
 	u16 miiaddr;
 	int timeout = CONFIG_MDIO_TIMEOUT;
@@ -51,7 +56,12 @@ static int dw_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 static int dw_mdio_write(struct mii_dev *bus, int addr, int devad, int reg,
 			u16 val)
 {
+#ifdef CONFIG_DM_ETH
+	struct dw_eth_dev *priv = dev_get_priv((struct udevice *)bus->priv);
+	struct eth_mac_regs *mac_p = priv->mac_regs_p;
+#else
 	struct eth_mac_regs *mac_p = bus->priv;
+#endif
 	ulong start;
 	u16 miiaddr;
 	int ret = -ETIMEDOUT, timeout = CONFIG_MDIO_TIMEOUT;
@@ -74,7 +84,40 @@ static int dw_mdio_write(struct mii_dev *bus, int addr, int devad, int reg,
 	return ret;
 }
 
-static int dw_mdio_init(const char *name, struct eth_mac_regs *mac_regs_p)
+#if CONFIG_DM_ETH
+static int dw_mdio_reset(struct mii_dev *bus)
+{
+	struct udevice *dev = bus->priv;
+	struct dw_eth_pdata *pdata = dev_get_platdata(dev);
+	int ret;
+
+	if (pdata->reset_gpio.dev == NULL)
+		return 0;
+
+	/* reset the phy */
+	ret = dm_gpio_set_value(&pdata->reset_gpio, 0);
+	if (ret)
+		return ret;
+
+	udelay(pdata->reset_delays[0]);
+
+	ret = dm_gpio_set_value(&pdata->reset_gpio, 1);
+	if (ret)
+		return ret;
+
+	udelay(pdata->reset_delays[1]);
+
+	ret = dm_gpio_set_value(&pdata->reset_gpio, 0);
+	if (ret)
+		return ret;
+
+	udelay(pdata->reset_delays[2]);
+
+	return 0;
+}
+#endif
+
+static int dw_mdio_init(const char *name, void *priv)
 {
 	struct mii_dev *bus = mdio_alloc();
 
@@ -85,9 +128,12 @@ static int dw_mdio_init(const char *name, struct eth_mac_regs *mac_regs_p)
 
 	bus->read = dw_mdio_read;
 	bus->write = dw_mdio_write;
+#ifdef CONFIG_DM_ETH
+	bus->reset = dw_mdio_reset;
+#endif
 	snprintf(bus->name, sizeof(bus->name), name);
 
-	bus->priv = (void *)mac_regs_p;
+	bus->priv = priv;
 
 	return mdio_register(bus);
 }
@@ -604,7 +650,7 @@ static int designware_eth_probe(struct udevice *dev)
 	priv->dma_regs_p = (struct eth_dma_regs *)(iobase + DW_DMA_BASE_OFFSET);
 	priv->interface = pdata->phy_interface;
 
-	dw_mdio_init(dev->name, priv->mac_regs_p);
+	dw_mdio_init(dev->name, dev);
 	priv->bus = miiphy_get_dev_by_name(dev->name);
 
 	ret = dw_phy_init(priv, dev);
@@ -624,8 +670,11 @@ static const struct eth_ops designware_eth_ops = {
 
 static int designware_eth_ofdata_to_platdata(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct dw_eth_pdata *dw_pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = &dw_pdata->eth_pdata;
 	const char *phy_mode;
+	int reset_flags = GPIOD_IS_OUT;
+	int ret = 0;
 
 	pdata->iobase = dev_get_addr(dev);
 	pdata->phy_interface = -1;
@@ -637,7 +686,20 @@ static int designware_eth_ofdata_to_platdata(struct udevice *dev)
 		return -EINVAL;
 	}
 
-	return 0;
+	if (fdtdec_get_bool(gd->fdt_blob, dev->of_offset,
+			    "snps,reset-active-low"))
+		reset_flags |= GPIOD_ACTIVE_LOW;
+
+	ret = gpio_request_by_name(dev, "snps,reset-gpio", 0,
+		&dw_pdata->reset_gpio, reset_flags);
+	if (ret == 0) {
+		ret = fdtdec_get_int_array(gd->fdt_blob, dev->of_offset,
+			"snps,reset-delays-us", dw_pdata->reset_delays, 3);
+	} else if (ret == -ENOENT) {
+		ret = 0;
+	}
+
+	return ret;
 }
 
 static const struct udevice_id designware_eth_ids[] = {
@@ -655,7 +717,7 @@ U_BOOT_DRIVER(eth_designware) = {
 	.probe	= designware_eth_probe,
 	.ops	= &designware_eth_ops,
 	.priv_auto_alloc_size = sizeof(struct dw_eth_dev),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.platdata_auto_alloc_size = sizeof(struct dw_eth_pdata),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };
 
