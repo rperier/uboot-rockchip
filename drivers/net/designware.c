@@ -564,8 +564,17 @@ int designware_initialize(ulong base_addr, u32 interface)
 static int designware_eth_start(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct dw_eth_dev *priv = dev_get_priv(dev);
+	int ret;
 
-	return _dw_eth_init(dev->priv, pdata->enetaddr);
+	ret = _dw_eth_init(priv, pdata->enetaddr);
+	if (ret)
+		return ret;
+
+	if (priv->started)
+		ret = priv->started(dev);
+
+	return ret;
 }
 
 static int designware_eth_send(struct udevice *dev, void *packet, int length)
