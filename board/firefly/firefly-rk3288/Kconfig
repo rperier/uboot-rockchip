@@ -7,6 +7,7 @@ config SYS_VENDOR
 	default "firefly"
 
 config SYS_CONFIG_NAME
+	string "System configuration name"
 	default "firefly-rk3288"
 
 config BOARD_SPECIFIC_OPTIONS # dummy
