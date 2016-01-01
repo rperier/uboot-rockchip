@@ -243,7 +243,7 @@
 		"done\0"
 
 #ifndef CONFIG_BOOTCOMMAND
-#define CONFIG_BOOTCOMMAND "run distro_bootcmd"
+#define CONFIG_BOOTCOMMAND "set serverip 192.168.0.20;set autoload no;dhcp;tftpboot 0x80000 zImage-rk3288-rock2-square.dtb;tftpboot 0x90000 zImage;bootz 0x90000 - 0x80000"
 #endif
 
 #endif  /* _CONFIG_CMD_DISTRO_BOOTCMD_H */
